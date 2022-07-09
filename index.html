@@ -1,0 +1,66 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>airhockey</title>
+    <script src="phaser.js"></script>
+    <style type="text/css">
+        body { margin: 10; }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            debug: true
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+var rackes_group;
+var myracket;
+var game = new Phaser.Game(config);
+
+function preload ()
+{
+    this.load.image('ground', 'assets/background.png');
+    this.load.image('racket', 'assets/racket.png');
+    this.load.image('ball', 'assets/ball.png');
+    this.load.image('hole', 'assets/hole.png');
+    this.load.image('mag', 'assets/mag.png');
+}
+
+function create ()
+{
+    // Background
+    this.add.image(400, 300, 'ground');
+
+    // Rackets
+    rackets = this.physics.add.group();
+    myracket = rackets.create(400, 300, 'racket');
+
+    this.input.on('pointermove', function (pointer) {
+        myracket.setPosition(pointer.x, pointer.y);
+    });
+}
+
+function update ()
+{
+}
+
+</script>
+
+</body>
+</html>
