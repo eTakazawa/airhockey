@@ -60,7 +60,7 @@ init: function (data)
 create: function ()
 {
     // Draw goal text
-    var g = this.add.graphics();
+    const g = this.add.graphics();
     g.fillStyle(0x000000, 0.2);
     g.fillRect(0, 300 - 32, 800, 64);
     this.add.text(400, 300, 'Goal!! Player ' + this.goalPlayer, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
@@ -113,7 +113,6 @@ initialize: function Game ()
 
 create: function ()
 {
-    isGoal = false;
     scores = [0, 0];
 
     // Set boundary collision
@@ -121,6 +120,14 @@ create: function ()
 
     // Background
     this.add.image(400, 300, 'ground');
+    // Center line
+    const g = this.add.graphics();
+    g.lineStyle(5, 0xFFFFFF, 1.0);
+    g.beginPath();
+    g.moveTo(400, 0);
+    g.lineTo(400, 600);
+    g.closePath();
+    g.strokePath();
 
     // Mouse
     this.mousefollower = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'mouse', null, {isSensor: true, isStatic: true});
@@ -163,7 +170,7 @@ create: function ()
     });
 
     // Score text
-    scoreText = this.add.text(400, 32, '0 - 0', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+    scoreText = this.add.text(16, 16, '0 - 0', { fontSize: '32px', fill: '#fff' }); //.setOrigin(0.5);
 
     // Collision / Ref: https://phaser.io/examples/v3/view/tilemap/collision/matter-detect-collision-with-tile
     this.matter.world.on('collisionstart', function (event) {
