@@ -31,6 +31,7 @@ var config = {
 
 var rackes_group;
 var myracket;
+var ball;
 var game = new Phaser.Game(config);
 
 function preload ()
@@ -51,9 +52,15 @@ function create ()
     rackets = this.physics.add.group();
     myracket = rackets.create(400, 300, 'racket').setCircle(16);
 
+    // Ball
+    ball = this.physics.add.image(600, 300, 'ball').setCircle(16);
+    ball.setCollideWorldBounds(true);
+    
     this.input.on('pointermove', function (pointer) {
         myracket.setPosition(pointer.x, pointer.y);
     });
+
+    this.physics.add.collider(ball, rackets);
 }
 
 function update ()
