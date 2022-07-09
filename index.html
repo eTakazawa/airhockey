@@ -100,15 +100,24 @@ initialize: function Game ()
     this.holePositions = [
         [holeOffset, height / 2],
         [width - holeOffset, height / 2]
-    ]
+    ];
     // ball
-    this.ballPosition = [width / 2, height / 2];
+    const ballOffset = 64;
+    this.ballPosition = [width / 2 - ballOffset, height / 2];
+    // magnet
+    const magOffset = height / 4;
+    this.magnetPositions = [
+        [width / 2, magOffset * 1],
+        [width / 2, magOffset * 2],
+        [width / 2, magOffset * 3]
+    ];
 
     // object
     this.rackets = new Array(2);
     this.holes = new Array(2);
     this.ball = null;
     this.mousefollower = null;
+    this.magnets = new Array(3);
 },
 
 create: function ()
@@ -133,8 +142,8 @@ create: function ()
     this.mousefollower = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'mouse', null, {isSensor: true, isStatic: true});
 
     // Racket
-    this.rackets[0] = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'racket', null, {
-        circleRadius: 16,
+    this.rackets[0] = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'racket')
+    this.rackets[0].setCircle(16, {
         restitution: 1,
         frictionStatic: 0,
         friction: 0,
@@ -143,8 +152,8 @@ create: function ()
     });
     
     // Ball
-    this.ball = this.matter.add.image(this.ballPosition[0], this.ballPosition[1], 'ball', null, {
-        circleRadius: 16,
+    this.ball = this.matter.add.image(this.ballPosition[0], this.ballPosition[1], 'ball');
+    this.ball.setCircle(16, {
         restitution: 1,
         frictionStatic: 0,
         friction: 0,
@@ -152,11 +161,23 @@ create: function ()
         label: 'ball',
     });
 
+    // Magnet
+    for (let i = 0; i < 3; i++) {
+        this.magnets[i] = this.matter.add.image(this.magnetPositions[i][0], this.magnetPositions[i][1], 'mag');
+        this.magnets[i].setCircle(16, {
+            restitution: 1,
+            frictionStatic: 0,
+            friction: 0,
+            frictionAir: 0,
+            label: 'magnet' + i,
+        });
+    }
+
     // Hole
     for (let i = 0; i < 2; i++) {
-        this.holes[i] = this.matter.add.image(this.holePositions[i][0], this.holePositions[i][1], 'hole', null, {
+        this.holes[i] = this.matter.add.image(this.holePositions[i][0], this.holePositions[i][1], 'hole');
+        this.holes[i].setCircle(32, {
             isStatic: true,
-            circleRadius: 32,
             label: 'hole' + i,
         });    
     }
@@ -191,6 +212,11 @@ create: function ()
                     this.scene.pause();
                     this.scene.launch('goal', {goalPlayer: goalPlayer});
                 }
+            }
+
+            // Check racket and magnet
+            for (let magnetId = 0; magnetId < 3; magnetId++) {
+                const magnetLabel = 'magnet' + magnetId;
             }
         }
     }, this);
