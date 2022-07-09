@@ -1,0 +1,304 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>airhockey</title>
+    <script src="phaser.js"></script>
+    <style type="text/css">
+        body { margin: 10; }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+/////////////////////////////////////////////////
+// Preload Scene
+/////////////////////////////////////////////////
+var Preloader = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Preloader ()
+{
+    Phaser.Scene.call(this, { key: 'preloader' });
+},
+
+preload: function ()
+{
+    this.load.image('ground', 'assets/background.png');
+    this.load.image('racket', 'assets/racket.png');
+    this.load.image('ball', 'assets/ball.png');
+    this.load.image('mouse', 'assets/mouse.png');
+    this.load.image('hole', 'assets/hole.png');
+    this.load.image('mag', 'assets/mag.png');
+},
+
+create: function ()
+{
+    this.scene.start('game');
+}
+});
+
+/////////////////////////////////////////////////
+// Goal Scene
+/////////////////////////////////////////////////
+var Goal = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Goal (data)
+{
+    Phaser.Scene.call(this, { key: 'goal' });
+},
+
+init: function (data)
+{
+    this.goalPlayer = data.goalPlayer;
+},
+
+create: function ()
+{
+    // Draw goal text
+    const g = this.add.graphics();
+    g.fillStyle(0x000000, 0.2);
+    g.fillRect(0, 300 - 32, 800, 64);
+    this.add.text(400, 300, 'Goal!! Player ' + this.goalPlayer, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+
+    // Reset scene / Ref: https://phaser.io/examples/v3/view/physics/matterjs/scene-restart
+    this.input.once('pointerdown', function (event) {
+        this.scene.get('game').ResetPositions();
+        this.scene.resume('game');
+        this.scene.stop();
+    }, this);
+}
+});
+
+/////////////////////////////////////////////////
+// Main Game Scene
+/////////////////////////////////////////////////
+var Game = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Game ()
+{
+    Phaser.Scene.call(this, { key: 'game' });
+
+    // initaial setting
+    const width = 800;
+    const height = 600;
+    // initial positions
+    // racket
+    const racketOffset = width / 4;
+    this.racketPositions = [
+        [width / 2 - racketOffset, height / 2],
+        [width / 2 + racketOffset, height / 2]
+    ];
+    // hole
+    const holeOffset = 48;
+    this.holePositions = [
+        [holeOffset, height / 2],
+        [width - holeOffset, height / 2]
+    ]
+    // ball
+    this.ballPosition = [width / 2, height / 2];
+
+    // object
+    this.rackets = new Array(2);
+    this.holes = new Array(2);
+    this.ball = null;
+    this.mousefollower = null;
+},
+
+create: function ()
+{
+    scores = [0, 0];
+
+    // Set boundary collision
+    this.matter.world.setBounds();
+
+    // Background
+    this.add.image(400, 300, 'ground');
+    // Center line
+    const g = this.add.graphics();
+    g.lineStyle(5, 0xFFFFFF, 1.0);
+    g.beginPath();
+    g.moveTo(400, 0);
+    g.lineTo(400, 600);
+    g.closePath();
+    g.strokePath();
+
+    // Mouse
+    this.mousefollower = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'mouse', null, {isSensor: true, isStatic: true});
+
+    // Racket
+    this.rackets[0] = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'racket', null, {
+        circleRadius: 16,
+        restitution: 1,
+        frictionStatic: 0,
+        friction: 0,
+        frictionAir: 0,
+        label: 'racket0',
+    });
+    
+    // Ball
+    this.ball = this.matter.add.image(this.ballPosition[0], this.ballPosition[1], 'ball', null, {
+        circleRadius: 16,
+        restitution: 1,
+        frictionStatic: 0,
+        friction: 0,
+        frictionAir: 0,
+        label: 'ball',
+    });
+
+    // Hole
+    for (let i = 0; i < 2; i++) {
+        this.holes[i] = this.matter.add.image(this.holePositions[i][0], this.holePositions[i][1], 'hole', null, {
+            isStatic: true,
+            circleRadius: 32,
+            label: 'hole' + i,
+        });    
+    }
+    
+    // Racket follow the mouse object
+    this.matter.add.constraint(this.rackets[0], this.mousefollower, 0, 0.2);
+
+    // Mousefollower setting
+    this.input.on('pointermove', function (pointer) {
+        this.scene.mousefollower.setPosition(pointer.x, pointer.y);
+    });
+
+    // Score text
+    scoreText = this.add.text(16, 16, '0 - 0', { fontSize: '32px', fill: '#fff' }); //.setOrigin(0.5);
+
+    // Collision / Ref: https://phaser.io/examples/v3/view/tilemap/collision/matter-detect-collision-with-tile
+    this.matter.world.on('collisionstart', function (event) {
+        for (var i = 0; i < event.pairs.length; i++) {
+            var bodyA = getRootBody(event.pairs[i].bodyA);
+            var bodyB = getRootBody(event.pairs[i].bodyB);
+            
+            // Check ball into hole
+            for (let holeId = 0; holeId < 2; holeId++) {
+                const holeLabel = 'hole' + holeId;
+                if ((bodyA.label === 'ball' && bodyB.label === holeLabel) || (bodyB.label === 'ball' && bodyA.label === holeLabel)) {
+                    const goalPlayer = holeId ? 0 : 1;
+                    // Increment scores
+                    scores[goalPlayer]++;
+                    // Update scoreText
+                    scoreText.setText(scores[0] + ' - ' + scores[1]);
+                    // Start goal scene
+                    this.scene.pause();
+                    this.scene.launch('goal', {goalPlayer: goalPlayer});
+                }
+            }
+        }
+    }, this);
+
+    // Reset position function
+    this.ResetPositions = function () {
+        // rackets
+        this.rackets[0].setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
+        this.mousefollower.setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
+        // ball
+        this.ball.setPosition(this.ballPosition[0], this.ballPosition[1]);
+        this.ball.setVelocity(0);
+        this.ball.setAngularVelocity(0);
+    }
+}
+});
+
+var config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'matter',
+        matter: {
+            enableSleeping: true,
+            gravity: false,
+            debug: {
+                showAxes: false,
+                showAngleIndicator: true,
+                angleColor: 0xe81153,
+
+                showBroadphase: false,
+                broadphaseColor: 0xffb400,
+
+                showBounds: false,
+                boundsColor: 0xffffff,
+
+                showVelocity: true,
+                velocityColor: 0x00aeef,
+
+                showCollisions: true,
+                collisionColor: 0xf5950c,
+    
+                showSeparations: false,
+                separationColor: 0xffa500,
+
+                showBody: true,
+                showStaticBody: true,
+                showInternalEdges: true,
+
+                renderFill: false,
+                renderLine: true,
+    
+                fillColor: 0x106909,
+                fillOpacity: 1,
+                lineColor: 0x28de19,
+                lineOpacity: 1,
+                lineThickness: 1,
+    
+                staticFillColor: 0x0d177b,
+                staticLineColor: 0x1327e4,
+
+                showSleeping: true,
+                staticBodySleepOpacity: 1,
+                sleepFillColor: 0x464646,
+                sleepLineColor: 0x999a99,
+    
+                showSensors: true,
+                sensorFillColor: 0x0d177b,
+                sensorLineColor: 0x1327e4,
+    
+                showPositions: true,
+                positionSize: 4,
+                positionColor: 0xe042da,
+    
+                showJoint: true,
+                jointColor: 0xe0e042,
+                jointLineOpacity: 1,
+                jointLineThickness: 2,
+    
+                pinSize: 4,
+                pinColor: 0x42e0e0,
+    
+                springColor: 0xe042e0,
+    
+                anchorColor: 0xefefef,
+                anchorSize: 4,
+    
+                showConvexHulls: true,
+                hullColor: 0xd703d0
+            }
+        }
+    },
+    scene: [ Preloader, Game, Goal ]
+};
+var game = new Phaser.Game(config);
+
+function getRootBody (body)
+{
+    if (body.parent === body) { return body; }
+    while (body.parent !== body)
+    {
+        body = body.parent;
+    }
+    return body;
+}
+
+</script>
+
+</body>
+</html>
