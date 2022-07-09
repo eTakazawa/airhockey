@@ -49,7 +49,7 @@ function create ()
 
     // Rackets
     rackets = this.physics.add.group();
-    myracket = rackets.create(400, 300, 'racket');
+    myracket = rackets.create(400, 300, 'racket').setCircle(16);
 
     this.input.on('pointermove', function (pointer) {
         myracket.setPosition(pointer.x, pointer.y);
