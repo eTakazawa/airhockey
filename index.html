@@ -55,19 +55,20 @@ initialize: function Goal (data)
 init: function (data)
 {
     this.goalPlayer = data.goalPlayer;
+    this.cause = data.cause;
 },
 
 create: function ()
 {
     // Draw goal text
     const g = this.add.graphics();
-    g.fillStyle(0x000000, 0.2);
+    g.fillStyle(0x0000ff, 1.0);
     g.fillRect(0, 300 - 32, 800, 64);
-    this.add.text(400, 300, 'Goal!! Player ' + this.goalPlayer, { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+    this.add.text(400, 300, 'Player ' + this.goalPlayer + '\'s point!!', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
 
     // Reset scene / Ref: https://phaser.io/examples/v3/view/physics/matterjs/scene-restart
     this.input.once('pointerdown', function (event) {
-        this.scene.get('game').ResetPositions();
+        this.scene.get('game').ResetGameState();
         this.scene.resume('game');
         this.scene.stop();
     }, this);
@@ -118,12 +119,14 @@ initialize: function Game ()
     this.ball = null;
     this.mousefollower = null;
     this.magnets = new Array(3);
+
+    // initial game states
+    this.scores = [0, 0];
+    this.magnetCounts = [0, 0];
 },
 
 create: function ()
 {
-    scores = [0, 0];
-
     // Set boundary collision
     this.matter.world.setBounds();
 
@@ -192,6 +195,7 @@ create: function ()
 
     // Score text
     scoreText = this.add.text(16, 16, '0 - 0', { fontSize: '32px', fill: '#fff' }); //.setOrigin(0.5);
+    magetText = this.add.text(16, 64, '  /  ', { fontSize: '32px', fill: '#0f0' });
 
     // Collision / Ref: https://phaser.io/examples/v3/view/tilemap/collision/matter-detect-collision-with-tile
     this.matter.world.on('collisionstart', function (event) {
@@ -205,24 +209,46 @@ create: function ()
                 if ((bodyA.label === 'ball' && bodyB.label === holeLabel) || (bodyB.label === 'ball' && bodyA.label === holeLabel)) {
                     const goalPlayer = holeId ? 0 : 1;
                     // Increment scores
-                    scores[goalPlayer]++;
+                    this.scores[goalPlayer]++;
                     // Update scoreText
-                    scoreText.setText(scores[0] + ' - ' + scores[1]);
+                    scoreText.setText(this.scores[0] + ' - ' + this.scores[1]);
                     // Start goal scene
                     this.scene.pause();
-                    this.scene.launch('goal', {goalPlayer: goalPlayer});
+                    this.scene.launch('goal', {goalPlayer: goalPlayer, cause: 'goal'});
+                }
+                for (let magnetId = 0; magnetId < 3; magnetId++) {
+                    const magnetLabel = 'magnet' + magnetId;
+                    if ((bodyA.label === holeLabel && bodyB.label === magnetLabel) || (bodyB.label === holeLabel && bodyA.label === magnetLabel)) {
+                        this.magnets[magnetId].destroy();
+                    }
                 }
             }
 
             // Check racket and magnet
-            for (let magnetId = 0; magnetId < 3; magnetId++) {
-                const magnetLabel = 'magnet' + magnetId;
+            for (let racketId = 0; racketId < 1; racketId++) {
+                for (let magnetId = 0; magnetId < 3; magnetId++) {
+                    const racketLabel = 'racket' + racketId;
+                    const magnetLabel = 'magnet' + magnetId;
+                    if ((bodyA.label === racketLabel && bodyB.label === magnetLabel) || (bodyB.label === racketLabel && bodyA.label === magnetLabel)) {
+                        this.magnets[magnetId].destroy();
+                        this.magnetCounts[racketId]++;
+                        // Update magnetText
+                        magetText.setText('x'.repeat(this.magnetCounts[0]) + ' / ' + 'x'.repeat(this.magnetCounts[1]));
+
+                        if (this.magnetCounts[racketId] == 2) {
+                            const goalPlayer = racketId ? 0 : 1;
+                            // Start goal scene
+                            this.scene.pause();
+                            this.scene.launch('goal', {goalPlayer: goalPlayer, cause: 'magnet'});
+                        }
+                    }
+                }
             }
         }
     }, this);
 
     // Reset position function
-    this.ResetPositions = function () {
+    this.ResetGameState = function () {
         // rackets
         this.rackets[0].setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
         this.mousefollower.setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
@@ -230,6 +256,20 @@ create: function ()
         this.ball.setPosition(this.ballPosition[0], this.ballPosition[1]);
         this.ball.setVelocity(0);
         this.ball.setAngularVelocity(0);
+        // magnets
+        for (let i = 0; i < 3; i++) {
+            this.magnets[i].destroy();
+            this.magnets[i] = this.matter.add.image(this.magnetPositions[i][0], this.magnetPositions[i][1], 'mag');
+            this.magnets[i].setCircle(16, {
+                restitution: 1,
+                frictionStatic: 0,
+                friction: 0,
+                frictionAir: 0,
+                label: 'magnet' + i,
+            });
+        }
+        this.magnetCounts = [0, 0];
+        magetText.setText('x'.repeat(this.magnetCounts[0]) + ' / ' + 'x'.repeat(this.magnetCounts[1]));
     }
 }
 });
