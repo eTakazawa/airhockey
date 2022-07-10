@@ -435,6 +435,11 @@ create: function () {
 
                         if (this.magnetCounts[racketId] == 2) {
                             const goalPlayer = racketId ? 0 : 1;
+                            // Increment scores
+                            this.scores[goalPlayer]++;
+                            // Update scoreText
+                            scoreText.setText(this.scores[0] + ' - ' + this.scores[1]);
+
                             // Start goal scene
                             this.scene.pause();
                             this.scene.launch('goal', {goalPlayer: goalPlayer, cause: 'magnet'});
