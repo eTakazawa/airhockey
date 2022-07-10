@@ -69,37 +69,78 @@ create: function () {
 }
 });
 
+/////////////////////////////////////////////////
+// Enemey AI
+/////////////////////////////////////////////////
 class EnemyAI {
     constructor () {
-        this.moveVelocity = 10.0;
     }
 
     // return velocity vec
-    run(rackets, magnets, ball, holes, w, h) {
+    runEasy(rackets, magnets, ball, holes, w, h) {
         // racket / magnet / ball / holes
+        const moveVelocity = 10.0;
         const enemyRacket = rackets[1];
         const initialPosition = new Phaser.Math.Vector2(w / 4 * 3, h / 2);
 
-        
         let vec = new Phaser.Math.Vector2(0, 0);
         if (ball.x < w / 2) { // if ball is in your area
             // Move to initial position
             let dist = Phaser.Math.Distance.Between(enemyRacket.x, enemyRacket.y, initialPosition.x, initialPosition.y);
-            if (dist > 10.0) {
+            if (dist > 64.0) {
                 vec = new Phaser.Math.Vector2(initialPosition.x - enemyRacket.x, initialPosition.y - enemyRacket.y)
-                .normalize()
-                .scale(this.moveVelocity);
+                    .normalize()
+                    .scale(moveVelocity);
             }
         }
         else {
             // Move to ball
             vec = new Phaser.Math.Vector2(ball.x - enemyRacket.x, ball.y - enemyRacket.y)
-            .normalize()
-            .scale(this.moveVelocity);
+                .normalize()
+                .scale(moveVelocity);
         }
 
         enemyRacket.setAwake();
         enemyRacket.setVelocity(vec.x, vec.y);
+    }
+
+    runHard(rackets, magnets, ball, holes, w, h) {
+        // racket / magnet / ball / holes
+        const moveVelocity = 30.0;
+        const enemyRacket = rackets[1];
+        const initialPosition = new Phaser.Math.Vector2(w / 4 * 3, h / 2);
+
+        enemyRacket.setVelocity(0, 0);
+        if (ball.x < w / 8 * 5) { // if ball is in your area
+            // Move to initial position
+            let dist = Phaser.Math.Distance.Between(enemyRacket.x, enemyRacket.y, initialPosition.x, initialPosition.y);
+            if (dist > 64.0) {
+                let vec = new Phaser.Math.Vector2(initialPosition.x - enemyRacket.x, initialPosition.y - enemyRacket.y)
+                    .normalize()
+                    .scale(moveVelocity);
+                enemyRacket.setAwake();
+                enemyRacket.setVelocity(vec.x, vec.y);
+            }
+        }
+        else {
+            enemyRacket.setAwake();
+            let ballPos = new Phaser.Math.Vector2(ball.x, ball.y);
+            let goalPos = new Phaser.Math.Vector2(holes[0].x, holes[0].y);
+            let goalToBall = new Phaser.Math.Vector2(ballPos.x - goalPos.x, ballPos.y - goalPos.y);
+            let jumpPos = goalToBall.clone()
+                .normalize()
+                .scale(64)
+                .add(ballPos);
+            // Jump
+            enemyRacket.setX(jumpPos.x);
+            enemyRacket.setY(jumpPos.y);
+            
+            // Shoot (cheat set ball's velocity)
+            let shootVec = goalToBall.clone()
+                .normalize()
+                .scale(-8);
+            ball.setVelocity(shootVec.x, shootVec.y);
+        }
     }
 };
 
@@ -366,7 +407,7 @@ create: function () {
 
 update: function() {
     // think enemy move
-    this.enemyAI.run(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
+    this.enemyAI.runHard(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
     
     if (this.enableMagneticForce) {
         for (let racketId = 0; racketId < 2; racketId++) {
