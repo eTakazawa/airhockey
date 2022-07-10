@@ -30,10 +30,67 @@ preload: function () {
     this.load.image('mouse', 'assets/mouse.png');
     this.load.image('hole', 'assets/hole.png');
     this.load.image('mag', 'assets/mag.png');
+
+    this.load.image('practice_button', 'assets/practice.png');
+    this.load.image('easy_button', 'assets/easy.png');
+    this.load.image('hard_button', 'assets/very_hard.png');
+    this.load.image('select_levels_button', 'assets/select_levels.png');
 },
 
 create: function () {
-    this.scene.start('game');
+    this.scene.start('title');
+}
+});
+
+/////////////////////////////////////////////////
+// Title Scene
+/////////////////////////////////////////////////
+var Title = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Preloader () {
+    Phaser.Scene.call(this, { key: 'title' });
+},
+
+create: function () {
+    // Background
+    const width = 800;
+    const height = 600;
+    this.add.image(width / 2, height / 2, 'ground');
+    // Center line
+    const g = this.add.graphics();
+    g.lineStyle(5, 0xFFFFFF, 1.0);
+    g.beginPath();
+    g.moveTo(400, 0);
+    g.lineTo(400, 600);
+    g.closePath();
+    g.strokePath();
+    // Corner line
+    g.strokeCircle(0, 0, 96);
+    g.strokeCircle(width, 0, 96);
+    g.strokeCircle(width, height, 96);
+    g.strokeCircle(0, height, 96);
+
+    // Add button
+    const base = 200;
+    const offset = 80;
+    this.add.image(width / 2, base, 'select_levels_button');
+    this.add.image(width / 2, base + offset * 1, 'practice_button')
+        .setInteractive()
+        .once('pointerup', function() {
+            this.scene.start('game', {level: 'practice'});
+        }, this);
+    this.add.image(width / 2, base + offset * 2, 'easy_button')
+        .setInteractive()
+        .once('pointerup', function() {
+            this.scene.start('game', {level: 'easy'});
+        }, this);
+    this.add.image(width / 2, base + offset * 3, 'hard_button')
+        .setInteractive()
+        .once('pointerup', function() {
+            this.scene.start('game', {level: 'hard'});
+        }, this);
 }
 });
 
@@ -73,10 +130,24 @@ create: function () {
 // Enemey AI
 /////////////////////////////////////////////////
 class EnemyAI {
-    constructor () {
+    constructor (level) {
+        this.level = level;
     }
 
-    // return velocity vec
+    run(rackets, magnets, ball, holes, width, height) {
+        if (this.level === 'practice') {
+            // do nothing
+        }
+        else if (this.level === 'easy') {
+            // easy move
+            this.runEasy(rackets, magnets, ball, holes, width, height);
+        }
+        else if (this.level === 'hard') {
+            // hard move
+            this.runHard(rackets, magnets, ball, holes, width, height);
+        }
+    }
+
     runEasy(rackets, magnets, ball, holes, w, h) {
         // racket / magnet / ball / holes
         const moveVelocity = 10.0;
@@ -201,6 +272,10 @@ initialize: function Game () {
     this.magnetCounts = [0, 0];
     this.width = width
     this.height = height;
+},
+
+init: function (data) {
+    this.enemyAI.level = data.level;
 },
 
 create: function () {
@@ -407,7 +482,7 @@ create: function () {
 
 update: function() {
     // think enemy move
-    this.enemyAI.runHard(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
+    this.enemyAI.run(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
     
     if (this.enableMagneticForce) {
         for (let racketId = 0; racketId < 2; racketId++) {
@@ -506,7 +581,7 @@ var config = {
             }
         }
     },
-    scene: [ Preloader, Game, Goal ]
+    scene: [ Preloader, Title, Game, Goal ]
 };
 var game = new Phaser.Game(config);
 
