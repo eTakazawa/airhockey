@@ -114,8 +114,10 @@ initialize: function Game () {
     Phaser.Scene.call(this, { key: 'game' });
 
     // Game parameter
-    this.enableMagneticForce = false;
-    this.magnetForceK = 0.01;
+    this.enableMagneticForce = true;
+    this.magnetForceK = 0.5;
+    this.magneticForceRadius = 96;
+    this.magnetFrictionAir = 0.5;
 
     // initaial setting
     const width = 800;
@@ -136,8 +138,8 @@ initialize: function Game () {
         [width - holeOffset, height / 2]
     ];
     // ball
-    const ballOffset = 64;
-    this.ballPosition = [width / 2 - ballOffset, height / 2];
+    const ballOffset = 48;
+    this.ballPosition = [ballOffset, height - ballOffset];
     // magnet
     const magOffset = height / 4;
     this.magnetPositions = [
@@ -176,9 +178,9 @@ create: function () {
     }
     
     // Background
-    this.add.image(400, 300, 'ground');
+    this.add.image(this.width / 2, this.height / 2, 'ground');
     // Center line
-    this.matter.add.rectangle(400, 300, 10, 600, {
+    this.matter.add.rectangle(this.width / 2, this.height / 2, 10, this.height, {
         isStatic: true,
         collisionFilter: {
             category: centerLineCategory,
@@ -192,6 +194,11 @@ create: function () {
     g.lineTo(400, 600);
     g.closePath();
     g.strokePath();
+    // Corner line
+    g.strokeCircle(0, 0, 96);
+    g.strokeCircle(this.width, 0, 96);
+    g.strokeCircle(this.width, this.height, 96);
+    g.strokeCircle(0, this.height, 96);
 
     // Mouse
     this.mousefollower = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'mouse', null, {isSensor: true, isStatic: true});
@@ -204,10 +211,11 @@ create: function () {
             frictionStatic: 0,
             friction: 0,
             frictionAir: 0,
+            density: 0.01,
             label: 'racket' + i,
             collisionFilter: {
                 category: racketCategory,
-                mask: allCategory
+                mask: allCategory,
             },
         });
     }
@@ -219,10 +227,11 @@ create: function () {
         frictionStatic: 0,
         friction: 0,
         frictionAir: 0,
+        density: 0.01,
         label: 'ball',
         collisionFilter: {
             category: ballCategory,
-            mask: allCategory
+            mask: allCategory,
         },
     });
 
@@ -233,7 +242,7 @@ create: function () {
             restitution: 1,
             frictionStatic: 0,
             friction: 0,
-            frictionAir: 0,
+            frictionAir: this.magnetFrictionAir,
             label: 'magnet' + i,
             collisionFilter: {
                 category: magnetCategory,
@@ -264,8 +273,9 @@ create: function () {
     });
 
     // Score text
-    scoreText = this.add.text(16, 16, '0 - 0', { fontSize: '32px', fill: '#fff' }); //.setOrigin(0.5);
-    magetText = this.add.text(16, 64, '  /  ', { fontSize: '32px', fill: '#0f0' });
+    scoreText = this.add.text(this.width / 2, 16, '0 - 0', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+    magetText0 = this.add.text(this.width / 2 - 96, 16, 'oo', { fontSize: '32px', fill: '#0f0' }).setOrigin(0.5);;
+    magetText1 = this.add.text(this.width / 2 + 96, 16, 'oo', { fontSize: '32px', fill: '#0f0' }).setOrigin(0.5);;
 
     // Collision / Ref: https://phaser.io/examples/v3/view/tilemap/collision/matter-detect-collision-with-tile
     this.matter.world.on('collisionstart', function (event) {
@@ -303,7 +313,9 @@ create: function () {
                         this.magnets[magnetId].destroy();
                         this.magnetCounts[racketId]++;
                         // Update magnetText
-                        magetText.setText('x'.repeat(this.magnetCounts[0]) + ' / ' + 'x'.repeat(this.magnetCounts[1]));
+                        const magetMarks = ['oo', 'xo', 'xx'];
+                        magetText0.setText(magetMarks[this.magnetCounts[0]]);
+                        magetText1.setText(magetMarks[this.magnetCounts[1]]);
 
                         if (this.magnetCounts[racketId] == 2) {
                             const goalPlayer = racketId ? 0 : 1;
@@ -338,7 +350,7 @@ create: function () {
                 restitution: 1,
                 frictionStatic: 0,
                 friction: 0,
-                frictionAir: 0,
+                frictionAir: this.magnetFrictionAir,
                 label: 'magnet' + i,
                 collisionFilter: {
                     category: magnetCategory,
@@ -347,7 +359,8 @@ create: function () {
             });
         }
         this.magnetCounts = [0, 0];
-        magetText.setText('x'.repeat(this.magnetCounts[0]) + ' / ' + 'x'.repeat(this.magnetCounts[1]));
+        magetText0.setText('oo');
+        magetText1.setText('oo');
     }
 },
 
@@ -364,10 +377,12 @@ update: function() {
 
                 // Simulate magnetic force
                 const dist = Phaser.Math.Distance.Between(racket.x, racket.y, magnet.x, magnet.y);
-                let fm = new Phaser.Math.Vector2(magnet.x - racket.x, magnet.y - racket.y)
-                    .normalize()
-                    .scale(-this.magnetForceK / dist);
-                magnet.applyForce(fm);
+                if (dist < this.magneticForceRadius) {
+                    let fm = new Phaser.Math.Vector2(magnet.x - racket.x, magnet.y - racket.y)
+                        .normalize()
+                        .scale(-this.magnetForceK / dist);
+                    magnet.applyForce(fm);
+                }
             }
         }
     }
