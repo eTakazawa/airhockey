@@ -19,13 +19,11 @@ var Preloader = new Phaser.Class({
 
 Extends: Phaser.Scene,
 
-initialize: function Preloader ()
-{
+initialize: function Preloader () {
     Phaser.Scene.call(this, { key: 'preloader' });
 },
 
-preload: function ()
-{
+preload: function () {
     this.load.image('ground', 'assets/background.png');
     this.load.image('racket', 'assets/racket.png');
     this.load.image('ball', 'assets/ball.png');
@@ -34,8 +32,7 @@ preload: function ()
     this.load.image('mag', 'assets/mag.png');
 },
 
-create: function ()
-{
+create: function () {
     this.scene.start('game');
 }
 });
@@ -47,19 +44,16 @@ var Goal = new Phaser.Class({
 
 Extends: Phaser.Scene,
 
-initialize: function Goal (data)
-{
+initialize: function Goal (data) {
     Phaser.Scene.call(this, { key: 'goal' });
 },
 
-init: function (data)
-{
+init: function (data) {
     this.goalPlayer = data.goalPlayer;
     this.cause = data.cause;
 },
 
-create: function ()
-{
+create: function () {
     // Draw goal text
     const g = this.add.graphics();
     g.fillStyle(0x0000ff, 1.0);
@@ -82,8 +76,7 @@ var Game = new Phaser.Class({
 
 Extends: Phaser.Scene,
 
-initialize: function Game ()
-{
+initialize: function Game () {
     Phaser.Scene.call(this, { key: 'game' });
 
     // Game parameter
@@ -130,8 +123,7 @@ initialize: function Game ()
     this.magnetCounts = [0, 0];
 },
 
-create: function ()
-{
+create: function () {
     // Set boundary collision
     this.matter.world.setBounds();
 
@@ -284,8 +276,7 @@ create: function ()
     }
 },
 
-update: function()
-{
+update: function() {
     if (this.enableMagneticForce) {
         for (let racketId = 0; racketId < 2; racketId++) {
             for (let magnetId = 0; magnetId < 3; magnetId++) {
@@ -385,8 +376,7 @@ var config = {
 };
 var game = new Phaser.Game(config);
 
-function getRootBody (body)
-{
+function getRootBody (body) {
     if (body.parent === body) { return body; }
     while (body.parent !== body)
     {
