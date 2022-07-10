@@ -1,0 +1,484 @@
+<!doctype html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8" />
+    <title>airhockey</title>
+    <script src="phaser.js"></script>
+    <style type="text/css">
+        body { margin: 10; }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+/////////////////////////////////////////////////
+// Preload Scene
+/////////////////////////////////////////////////
+var Preloader = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Preloader () {
+    Phaser.Scene.call(this, { key: 'preloader' });
+},
+
+preload: function () {
+    this.load.image('ground', 'assets/background.png');
+    this.load.image('racket', 'assets/racket.png');
+    this.load.image('ball', 'assets/ball.png');
+    this.load.image('mouse', 'assets/mouse.png');
+    this.load.image('hole', 'assets/hole.png');
+    this.load.image('mag', 'assets/mag.png');
+},
+
+create: function () {
+    this.scene.start('game');
+}
+});
+
+/////////////////////////////////////////////////
+// Goal Scene
+/////////////////////////////////////////////////
+var Goal = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Goal (data) {
+    Phaser.Scene.call(this, { key: 'goal' });
+},
+
+init: function (data) {
+    this.goalPlayer = data.goalPlayer;
+    this.cause = data.cause;
+},
+
+create: function () {
+    // Draw goal text
+    const g = this.add.graphics();
+    g.fillStyle(0x0000ff, 1.0);
+    g.fillRect(0, 300 - 32, 800, 64);
+    this.add.text(400, 300, 'Player ' + this.goalPlayer + '\'s point!!', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+
+    // Reset scene / Ref: https://phaser.io/examples/v3/view/physics/matterjs/scene-restart
+    this.input.once('pointerdown', function (event) {
+        this.scene.get('game').ResetGameState();
+        this.scene.resume('game');
+        this.scene.stop();
+    }, this);
+}
+});
+
+class EnemyAI {
+    constructor () {
+        this.moveVelocity = 10.0;
+    }
+
+    // return velocity vec
+    run(rackets, magnets, ball, holes, w, h) {
+        // racket / magnet / ball / holes
+        const enemyRacket = rackets[1];
+        const initialPosition = new Phaser.Math.Vector2(w / 4 * 3, h / 2);
+
+        
+        let vec = new Phaser.Math.Vector2(0, 0);
+        if (ball.x < w / 2) { // if ball is in your area
+            // Move to initial position
+            let dist = Phaser.Math.Distance.Between(enemyRacket.x, enemyRacket.y, initialPosition.x, initialPosition.y);
+            if (dist > 10.0) {
+                vec = new Phaser.Math.Vector2(initialPosition.x - enemyRacket.x, initialPosition.y - enemyRacket.y)
+                .normalize()
+                .scale(this.moveVelocity);
+            }
+        }
+        else {
+            // Move to ball
+            vec = new Phaser.Math.Vector2(ball.x - enemyRacket.x, ball.y - enemyRacket.y)
+            .normalize()
+            .scale(this.moveVelocity);
+        }
+
+        enemyRacket.setAwake();
+        enemyRacket.setVelocity(vec.x, vec.y);
+    }
+};
+
+/////////////////////////////////////////////////
+// Main Game Scene
+/////////////////////////////////////////////////
+var Game = new Phaser.Class({
+
+Extends: Phaser.Scene,
+
+initialize: function Game () {
+    Phaser.Scene.call(this, { key: 'game' });
+
+    // Game parameter
+    this.enableMagneticForce = true;
+    this.magnetForceK = 0.5;
+    this.magneticForceRadius = 96;
+    this.magnetFrictionAir = 0.5;
+
+    // initaial setting
+    const width = 800;
+    const height = 600;
+    this.enemyAI = new EnemyAI();
+
+    // initial positions
+    // racket
+    const racketOffset = width / 4;
+    this.racketPositions = [
+        [width / 2 - racketOffset, height / 2],
+        [width / 2 + racketOffset, height / 2]
+    ];
+    // hole
+    const holeOffset = 48;
+    this.holePositions = [
+        [holeOffset, height / 2],
+        [width - holeOffset, height / 2]
+    ];
+    // ball
+    const ballOffset = 48;
+    this.ballPosition = [ballOffset, height - ballOffset];
+    // magnet
+    const magOffset = height / 4;
+    this.magnetPositions = [
+        [width / 2, magOffset * 1],
+        [width / 2, magOffset * 2],
+        [width / 2, magOffset * 3]
+    ];
+
+    // object
+    this.rackets = new Array(2);
+    this.holes = new Array(2);
+    this.ball = null;
+    this.mousefollower = null;
+    this.magnets = new Array(3);
+
+    // initial game states
+    this.scores = [0, 0];
+    this.magnetCounts = [0, 0];
+    this.width = width
+    this.height = height;
+},
+
+create: function () {
+    let wallCategory = 0x001;
+    let racketCategory = this.matter.world.nextCategory();
+    let centerLineCategory = this.matter.world.nextCategory();
+    let magnetCategory = this.matter.world.nextCategory();
+    let ballCategory = this.matter.world.nextCategory();
+    let holeCategory = this.matter.world.nextCategory();
+    let allCategory = wallCategory | racketCategory | centerLineCategory | magnetCategory | ballCategory | holeCategory;
+
+    // Set boundary collision
+    this.matter.world.setBounds();
+    for (let id in this.matter.world.walls) {
+        this.matter.world.walls[id].setOnCollideWith(allCategory);
+    }
+    
+    // Background
+    this.add.image(this.width / 2, this.height / 2, 'ground');
+    // Center line
+    this.matter.add.rectangle(this.width / 2, this.height / 2, 10, this.height, {
+        isStatic: true,
+        collisionFilter: {
+            category: centerLineCategory,
+            mask: racketCategory
+        },
+    });
+    const g = this.add.graphics();
+    g.lineStyle(5, 0xFFFFFF, 1.0);
+    g.beginPath();
+    g.moveTo(400, 0);
+    g.lineTo(400, 600);
+    g.closePath();
+    g.strokePath();
+    // Corner line
+    g.strokeCircle(0, 0, 96);
+    g.strokeCircle(this.width, 0, 96);
+    g.strokeCircle(this.width, this.height, 96);
+    g.strokeCircle(0, this.height, 96);
+
+    // Mouse
+    this.mousefollower = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'mouse', null, {isSensor: true, isStatic: true});
+
+    // Racket
+    for (let i = 0; i < 2; i++) {
+        this.rackets[i] = this.matter.add.image(this.racketPositions[i][0], this.racketPositions[i][1], 'racket')
+        this.rackets[i].setCircle(16, {
+            restitution: 1,
+            frictionStatic: 0,
+            friction: 0,
+            frictionAir: 0,
+            density: 0.1,
+            label: 'racket' + i,
+            collisionFilter: {
+                category: racketCategory,
+                mask: allCategory,
+            },
+        });
+    }
+    
+    // Ball
+    this.ball = this.matter.add.image(this.ballPosition[0], this.ballPosition[1], 'ball');
+    this.ball.setCircle(16, {
+        restitution: 1,
+        frictionStatic: 0,
+        friction: 0,
+        frictionAir: 0,
+        density: 0.1,
+        label: 'ball',
+        collisionFilter: {
+            category: ballCategory,
+            mask: allCategory,
+        },
+    });
+
+    // Magnet
+    for (let i = 0; i < 3; i++) {
+        this.magnets[i] = this.matter.add.image(this.magnetPositions[i][0], this.magnetPositions[i][1], 'mag');
+        this.magnets[i].setCircle(16, {
+            restitution: 1,
+            frictionStatic: 0,
+            friction: 0,
+            frictionAir: this.magnetFrictionAir,
+            label: 'magnet' + i,
+            collisionFilter: {
+                category: magnetCategory,
+                mask: allCategory
+            },
+        });
+    }
+
+    // Hole
+    for (let i = 0; i < 2; i++) {
+        this.holes[i] = this.matter.add.image(this.holePositions[i][0], this.holePositions[i][1], 'hole');
+        this.holes[i].setCircle(32, {
+            isStatic: true,
+            label: 'hole' + i,
+            collisionFilter: {
+                category: holeCategory,
+                mask: allCategory
+            },
+        });    
+    }
+    
+    // Racket follow the mouse object
+    this.matter.add.constraint(this.rackets[0], this.mousefollower, 0, 0.2);
+
+    // Mousefollower setting
+    this.input.on('pointermove', function (pointer) {
+        this.scene.mousefollower.setPosition(pointer.x, pointer.y);
+    });
+
+    // Score text
+    scoreText = this.add.text(this.width / 2, 16, '0 - 0', { fontSize: '32px', fill: '#fff' }).setOrigin(0.5);
+    magetText0 = this.add.text(this.width / 2 - 96, 16, 'oo', { fontSize: '32px', fill: '#0f0' }).setOrigin(0.5);;
+    magetText1 = this.add.text(this.width / 2 + 96, 16, 'oo', { fontSize: '32px', fill: '#0f0' }).setOrigin(0.5);;
+
+    // Collision / Ref: https://phaser.io/examples/v3/view/tilemap/collision/matter-detect-collision-with-tile
+    this.matter.world.on('collisionstart', function (event) {
+        for (var i = 0; i < event.pairs.length; i++) {
+            var bodyA = getRootBody(event.pairs[i].bodyA);
+            var bodyB = getRootBody(event.pairs[i].bodyB);
+            
+            // Check ball into hole
+            for (let holeId = 0; holeId < 2; holeId++) {
+                const holeLabel = 'hole' + holeId;
+                if ((bodyA.label === 'ball' && bodyB.label === holeLabel) || (bodyB.label === 'ball' && bodyA.label === holeLabel)) {
+                    const goalPlayer = holeId ? 0 : 1;
+                    // Increment scores
+                    this.scores[goalPlayer]++;
+                    // Update scoreText
+                    scoreText.setText(this.scores[0] + ' - ' + this.scores[1]);
+                    // Start goal scene
+                    this.scene.pause();
+                    this.scene.launch('goal', {goalPlayer: goalPlayer, cause: 'goal'});
+                }
+                for (let magnetId = 0; magnetId < 3; magnetId++) {
+                    const magnetLabel = 'magnet' + magnetId;
+                    if ((bodyA.label === holeLabel && bodyB.label === magnetLabel) || (bodyB.label === holeLabel && bodyA.label === magnetLabel)) {
+                        this.magnets[magnetId].destroy();
+                    }
+                }
+            }
+
+            // Check racket and magnet
+            for (let racketId = 0; racketId < 2; racketId++) {
+                for (let magnetId = 0; magnetId < 3; magnetId++) {
+                    const racketLabel = 'racket' + racketId;
+                    const magnetLabel = 'magnet' + magnetId;
+                    if ((bodyA.label === racketLabel && bodyB.label === magnetLabel) || (bodyB.label === racketLabel && bodyA.label === magnetLabel)) {
+                        this.magnets[magnetId].destroy();
+                        this.magnetCounts[racketId]++;
+                        // Update magnetText
+                        const magetMarks = ['oo', 'xo', 'xx'];
+                        magetText0.setText(magetMarks[this.magnetCounts[0]]);
+                        magetText1.setText(magetMarks[this.magnetCounts[1]]);
+
+                        if (this.magnetCounts[racketId] == 2) {
+                            const goalPlayer = racketId ? 0 : 1;
+                            // Start goal scene
+                            this.scene.pause();
+                            this.scene.launch('goal', {goalPlayer: goalPlayer, cause: 'magnet'});
+                        }
+                    }
+                }
+            }
+        }
+    }, this);
+
+    // Reset position function
+    this.ResetGameState = function () {
+        // rackets
+        for (let i = 0; i < 2; i++) {
+            this.rackets[i].setPosition(this.racketPositions[i][0], this.racketPositions[i][1]);
+            this.rackets[i].setVelocity(0);
+            this.rackets[i].setAngularVelocity(0);
+        }
+        this.mousefollower.setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
+        // ball
+        this.ball.setPosition(this.ballPosition[0], this.ballPosition[1]);
+        this.ball.setVelocity(0);
+        this.ball.setAngularVelocity(0);
+        // magnets
+        for (let i = 0; i < 3; i++) {
+            this.magnets[i].destroy();
+            this.magnets[i] = this.matter.add.image(this.magnetPositions[i][0], this.magnetPositions[i][1], 'mag');
+            this.magnets[i].setCircle(16, {
+                restitution: 1,
+                frictionStatic: 0,
+                friction: 0,
+                frictionAir: this.magnetFrictionAir,
+                label: 'magnet' + i,
+                collisionFilter: {
+                    category: magnetCategory,
+                    mask: allCategory
+                },
+            });
+        }
+        this.magnetCounts = [0, 0];
+        magetText0.setText('oo');
+        magetText1.setText('oo');
+    }
+},
+
+update: function() {
+    // think enemy move
+    this.enemyAI.run(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
+    
+    if (this.enableMagneticForce) {
+        for (let racketId = 0; racketId < 2; racketId++) {
+            for (let magnetId = 0; magnetId < 3; magnetId++) {
+                const racket = this.rackets[racketId];
+                const magnet = this.magnets[magnetId];
+                if (!magnet.active) continue;
+
+                // Simulate magnetic force
+                const dist = Phaser.Math.Distance.Between(racket.x, racket.y, magnet.x, magnet.y);
+                if (dist < this.magneticForceRadius) {
+                    let fm = new Phaser.Math.Vector2(magnet.x - racket.x, magnet.y - racket.y)
+                        .normalize()
+                        .scale(-this.magnetForceK / dist);
+                    magnet.applyForce(fm);
+                }
+            }
+        }
+    }
+}
+});
+
+var config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'matter',
+        matter: {
+            enableSleeping: true,
+            gravity: false,
+            debug: {
+                showAxes: false,
+                showAngleIndicator: true,
+                angleColor: 0xe81153,
+
+                showBroadphase: false,
+                broadphaseColor: 0xffb400,
+
+                showBounds: false,
+                boundsColor: 0xffffff,
+
+                showVelocity: true,
+                velocityColor: 0x00aeef,
+
+                showCollisions: true,
+                collisionColor: 0xf5950c,
+    
+                showSeparations: false,
+                separationColor: 0xffa500,
+
+                showBody: true,
+                showStaticBody: true,
+                showInternalEdges: true,
+
+                renderFill: false,
+                renderLine: true,
+    
+                fillColor: 0x106909,
+                fillOpacity: 1,
+                lineColor: 0x28de19,
+                lineOpacity: 1,
+                lineThickness: 1,
+    
+                staticFillColor: 0x0d177b,
+                staticLineColor: 0x1327e4,
+
+                showSleeping: true,
+                staticBodySleepOpacity: 1,
+                sleepFillColor: 0x464646,
+                sleepLineColor: 0x999a99,
+    
+                showSensors: true,
+                sensorFillColor: 0x0d177b,
+                sensorLineColor: 0x1327e4,
+    
+                showPositions: true,
+                positionSize: 4,
+                positionColor: 0xe042da,
+    
+                showJoint: true,
+                jointColor: 0xe0e042,
+                jointLineOpacity: 1,
+                jointLineThickness: 2,
+    
+                pinSize: 4,
+                pinColor: 0x42e0e0,
+    
+                springColor: 0xe042e0,
+    
+                anchorColor: 0xefefef,
+                anchorSize: 4,
+    
+                showConvexHulls: true,
+                hullColor: 0xd703d0
+            }
+        }
+    },
+    scene: [ Preloader, Game, Goal ]
+};
+var game = new Phaser.Game(config);
+
+function getRootBody (body) {
+    if (body.parent === body) { return body; }
+    while (body.parent !== body)
+    {
+        body = body.parent;
+    }
+    return body;
+}
+
+</script>
+
+</body>
+</html>
