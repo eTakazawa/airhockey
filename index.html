@@ -89,7 +89,7 @@ initialize: function Game ()
     // Game parameter
     this.enableMagneticForce = true;
     this.magnetForceK = 0.01;
-    
+
     // initaial setting
     const width = 800;
     const height = 600;
@@ -150,14 +150,16 @@ create: function ()
     this.mousefollower = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'mouse', null, {isSensor: true, isStatic: true});
 
     // Racket
-    this.rackets[0] = this.matter.add.image(this.racketPositions[0][0], this.racketPositions[0][1], 'racket')
-    this.rackets[0].setCircle(16, {
-        restitution: 1,
-        frictionStatic: 0,
-        friction: 0,
-        frictionAir: 0,
-        label: 'racket0',
-    });
+    for (let i = 0; i < 2; i++) {
+        this.rackets[i] = this.matter.add.image(this.racketPositions[i][0], this.racketPositions[i][1], 'racket')
+        this.rackets[i].setCircle(16, {
+            restitution: 1,
+            frictionStatic: 0,
+            friction: 0,
+            frictionAir: 0,
+            label: 'racket' + i,
+        });
+    }
     
     // Ball
     this.ball = this.matter.add.image(this.ballPosition[0], this.ballPosition[1], 'ball');
@@ -230,7 +232,7 @@ create: function ()
             }
 
             // Check racket and magnet
-            for (let racketId = 0; racketId < 1; racketId++) {
+            for (let racketId = 0; racketId < 2; racketId++) {
                 for (let magnetId = 0; magnetId < 3; magnetId++) {
                     const racketLabel = 'racket' + racketId;
                     const magnetLabel = 'magnet' + magnetId;
@@ -255,7 +257,11 @@ create: function ()
     // Reset position function
     this.ResetGameState = function () {
         // rackets
-        this.rackets[0].setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
+        for (let i = 0; i < 2; i++) {
+            this.rackets[i].setPosition(this.racketPositions[i][0], this.racketPositions[i][1]);
+            this.rackets[i].setVelocity(0);
+            this.rackets[i].setAngularVelocity(0);
+        }
         this.mousefollower.setPosition(this.racketPositions[0][0], this.racketPositions[0][1]);
         // ball
         this.ball.setPosition(this.ballPosition[0], this.ballPosition[1]);
@@ -281,7 +287,7 @@ create: function ()
 update: function()
 {
     if (this.enableMagneticForce) {
-        for (let racketId = 0; racketId < 1; racketId++) {
+        for (let racketId = 0; racketId < 2; racketId++) {
             for (let magnetId = 0; magnetId < 3; magnetId++) {
                 const racket = this.rackets[racketId];
                 const magnet = this.magnets[magnetId];
