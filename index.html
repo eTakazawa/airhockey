@@ -69,6 +69,40 @@ create: function () {
 }
 });
 
+class EnemyAI {
+    constructor () {
+        this.moveVelocity = 10.0;
+    }
+
+    // return velocity vec
+    run(rackets, magnets, ball, holes, w, h) {
+        // racket / magnet / ball / holes
+        const enemyRacket = rackets[1];
+        const initialPosition = new Phaser.Math.Vector2(w / 4 * 3, h / 2);
+
+        
+        let vec = new Phaser.Math.Vector2(0, 0);
+        if (ball.x < w / 2) { // if ball is in your area
+            // Move to initial position
+            let dist = Phaser.Math.Distance.Between(enemyRacket.x, enemyRacket.y, initialPosition.x, initialPosition.y);
+            if (dist > 10.0) {
+                vec = new Phaser.Math.Vector2(initialPosition.x - enemyRacket.x, initialPosition.y - enemyRacket.y)
+                .normalize()
+                .scale(this.moveVelocity);
+            }
+        }
+        else {
+            // Move to ball
+            vec = new Phaser.Math.Vector2(ball.x - enemyRacket.x, ball.y - enemyRacket.y)
+            .normalize()
+            .scale(this.moveVelocity);
+        }
+
+        enemyRacket.setAwake();
+        enemyRacket.setVelocity(vec.x, vec.y);
+    }
+};
+
 /////////////////////////////////////////////////
 // Main Game Scene
 /////////////////////////////////////////////////
@@ -80,12 +114,13 @@ initialize: function Game () {
     Phaser.Scene.call(this, { key: 'game' });
 
     // Game parameter
-    this.enableMagneticForce = true;
+    this.enableMagneticForce = false;
     this.magnetForceK = 0.01;
 
     // initaial setting
     const width = 800;
     const height = 600;
+    this.enemyAI = new EnemyAI();
 
     // initial positions
     // racket
@@ -121,15 +156,35 @@ initialize: function Game () {
     // initial game states
     this.scores = [0, 0];
     this.magnetCounts = [0, 0];
+    this.width = width
+    this.height = height;
 },
 
 create: function () {
+    let wallCategory = 0x001;
+    let racketCategory = this.matter.world.nextCategory();
+    let centerLineCategory = this.matter.world.nextCategory();
+    let magnetCategory = this.matter.world.nextCategory();
+    let ballCategory = this.matter.world.nextCategory();
+    let holeCategory = this.matter.world.nextCategory();
+    let allCategory = wallCategory | racketCategory | centerLineCategory | magnetCategory | ballCategory | holeCategory;
+
     // Set boundary collision
     this.matter.world.setBounds();
-
+    for (let id in this.matter.world.walls) {
+        this.matter.world.walls[id].setOnCollideWith(allCategory);
+    }
+    
     // Background
     this.add.image(400, 300, 'ground');
     // Center line
+    this.matter.add.rectangle(400, 300, 10, 600, {
+        isStatic: true,
+        collisionFilter: {
+            category: centerLineCategory,
+            mask: racketCategory
+        },
+    });
     const g = this.add.graphics();
     g.lineStyle(5, 0xFFFFFF, 1.0);
     g.beginPath();
@@ -150,6 +205,10 @@ create: function () {
             friction: 0,
             frictionAir: 0,
             label: 'racket' + i,
+            collisionFilter: {
+                category: racketCategory,
+                mask: allCategory
+            },
         });
     }
     
@@ -161,6 +220,10 @@ create: function () {
         friction: 0,
         frictionAir: 0,
         label: 'ball',
+        collisionFilter: {
+            category: ballCategory,
+            mask: allCategory
+        },
     });
 
     // Magnet
@@ -172,6 +235,10 @@ create: function () {
             friction: 0,
             frictionAir: 0,
             label: 'magnet' + i,
+            collisionFilter: {
+                category: magnetCategory,
+                mask: allCategory
+            },
         });
     }
 
@@ -181,6 +248,10 @@ create: function () {
         this.holes[i].setCircle(32, {
             isStatic: true,
             label: 'hole' + i,
+            collisionFilter: {
+                category: holeCategory,
+                mask: allCategory
+            },
         });    
     }
     
@@ -269,6 +340,10 @@ create: function () {
                 friction: 0,
                 frictionAir: 0,
                 label: 'magnet' + i,
+                collisionFilter: {
+                    category: magnetCategory,
+                    mask: allCategory
+                },
             });
         }
         this.magnetCounts = [0, 0];
@@ -277,6 +352,9 @@ create: function () {
 },
 
 update: function() {
+    // think enemy move
+    this.enemyAI.run(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
+    
     if (this.enableMagneticForce) {
         for (let racketId = 0; racketId < 2; racketId++) {
             for (let magnetId = 0; magnetId < 3; magnetId++) {
