@@ -489,6 +489,7 @@ update: function() {
     // think enemy move
     this.enemyAI.run(this.rackets, this.magnets, this.ball, this.holes, this.width, this.height);
     
+    // Calclate magnet force
     if (this.enableMagneticForce) {
         for (let racketId = 0; racketId < 2; racketId++) {
             for (let magnetId = 0; magnetId < 3; magnetId++) {
