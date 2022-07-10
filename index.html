@@ -86,9 +86,14 @@ initialize: function Game ()
 {
     Phaser.Scene.call(this, { key: 'game' });
 
+    // Game parameter
+    this.enableMagneticForce = true;
+    this.magnetForceK = 0.01;
+    
     // initaial setting
     const width = 800;
     const height = 600;
+
     // initial positions
     // racket
     const racketOffset = width / 4;
@@ -270,6 +275,26 @@ create: function ()
         }
         this.magnetCounts = [0, 0];
         magetText.setText('x'.repeat(this.magnetCounts[0]) + ' / ' + 'x'.repeat(this.magnetCounts[1]));
+    }
+},
+
+update: function()
+{
+    if (this.enableMagneticForce) {
+        for (let racketId = 0; racketId < 1; racketId++) {
+            for (let magnetId = 0; magnetId < 3; magnetId++) {
+                const racket = this.rackets[racketId];
+                const magnet = this.magnets[magnetId];
+                if (!magnet.active) continue;
+
+                // Simulate magnetic force
+                const dist = Phaser.Math.Distance.Between(racket.x, racket.y, magnet.x, magnet.y);
+                let fm = new Phaser.Math.Vector2(magnet.x - racket.x, magnet.y - racket.y)
+                    .normalize()
+                    .scale(-this.magnetForceK / dist);
+                magnet.applyForce(fm);
+            }
+        }
     }
 }
 });
